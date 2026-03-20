@@ -25,37 +25,93 @@
 */
 #define RCC_AHB1ENR (*(volatile uint32_t *)(0x40023800 + 0x30))
 
-#define GPIOD_BASE (0x40020C00)
-
-/*
-    2. GPIOD Base address: 0x40020C00
-    GPIO Port mode register offset: 0x00
+/**
+    green light register
+    moder: output setting using port 12 bits 24 and 25
+    01 for output 00 for input
+    ODR: output register 1 for on 0 or off
 */
+#define GPIOD_BASE (0x40020C00)
 #define GPIOD_MODER (*(volatile uint32_t *)(GPIOD_BASE + 0x00))
+#define GPIOD_ODR (*(volatile uint32_t *)(GPIOD_BASE + 0x14))
 
 /**
-    3. GPIO port output data register
-    address offset: 0x14
+    port A blue button port 0
 */
 
-#define GPIOD_ODR (*(volatile uint32_t *)(GPIOD_BASE + 0x14))
+#define GPIOA_BASE (0x40020000)
+#define GPIOA_MODER (*(volatile uint32_t *)(GPIOA_BASE + 0x00))
+#define GPIOA_IDR (*(volatile uint32_t *)(GPIOA_BASE + 0x10))
+
+
+/**
+    systick registers  
+*/
+
+// SysTick control and Status register
+#define SYSTICK_CSR (*(volatile uint32_t *)(0xE000E010))
+
+// SysTick reload value register
+#define SYSTICK_RVR (*(volatile uint32_t *)(0xE000E014))
+
+// Systick current value register
+#define SYSTICK_CVR (*(volatile uint32_t *)(0xE000E018))
+
+void delay(uint32_t ms){
+    SYSTICK_RVR = 16000-1;
+
+    SYSTICK_CVR = 0;
+
+    SYSTICK_CSR = 5;
+
+    for(uint32_t i = 0; i<ms; i++){
+        while((SYSTICK_CSR & (1<<16)) == 0){
+
+        }
+    }
+
+    SYSTICK_CSR = 0;
+}
+
+#define TRUE 1
+#define FALSE 0
+
+void toggle_green_light(){
+    GPIOD_ODR ^= (1<<12);
+}
+
+uint32_t is_blue_button_pressed(){
+    if((GPIOA_IDR & (1<<0)) == 0){
+        return FALSE;
+    }
+    return TRUE;
+} 
 
 int main(void){
 
     // Enable the clock for GPIOD
     RCC_AHB1ENR |= (1<<3);
+    RCC_AHB1ENR |= (1<<0);
 
     // Step 1 make pin 12 bits 24 and 25 00 
     GPIOD_MODER &= ~(3<<24);
-
-    // step 2 change the moder from 00 to 01
     GPIOD_MODER |= (1<<24);
 
-    while(1){
-        GPIOD_ODR ^= (1<<12);
+    GPIOA_MODER &= ~(3<<0);
 
-        for(volatile uint32_t i=0; i<5000000; i++){
-            
+    uint32_t count = 1;
+
+    while(1){
+        if(is_blue_button_pressed()){
+            toggle_green_light();
+            count = 1;
+        }else{
+            count++;
+            if(count == 10){
+                toggle_green_light();
+                count = 1;
+            }
         }
+        delay(100);
     }
 }
